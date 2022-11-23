@@ -19,23 +19,23 @@ pub struct GraphNode<T> {
     conn: Vec<T>,
 }
 
-type Graph<'a, T> = HashMap<T,GraphNode<T>>;
+type Graph<'a, T> = HashMap<T, GraphNode<T>>;
 
 impl PartialEq<SdkStd> for &SdkStd {
     fn eq(&self, other: &SdkStd) -> bool {
         match self {
             True => match other {
                 True => true,
-                _ => false
-            }
+                _ => false,
+            },
             Poss => match other {
                 Poss => true,
-                _ => false
-            }
+                _ => false,
+            },
             False => match other {
                 False => true,
-                _ => false
-            }
+                _ => false,
+            },
         }
     }
 }
@@ -69,7 +69,7 @@ impl Board<SdkStd> {
                 for z in 0..self.size {
                     match self.get(x, y, z) {
                         True => {
-                            s += &((z + 1).to_string()+",");
+                            s += &((z + 1).to_string() + ",");
                             has_digit = true;
                             break;
                         }
@@ -87,7 +87,13 @@ impl Board<SdkStd> {
 
 impl Puzzle<SdkStd> {
     pub(crate) fn init(size: usize) -> Puzzle<SdkStd> {
-        let s = Self{board: Board{ data: vec![Poss; size * size * size], size}, constraints : vec![]};
+        let s = Self {
+            board: Board {
+                data: vec![Poss; size * size * size],
+                size,
+            },
+            constraints: vec![],
+        };
         s
     }
 
@@ -150,7 +156,7 @@ impl Puzzle<SdkStd> {
             did = con.apply(&mut self.board) || did;
         }
         match did {
-            true => {true}
+            true => true,
             false => {
                 println!("Try loops");
                 self.rem_odd_loops(None)
@@ -201,13 +207,16 @@ impl Puzzle<SdkStd> {
     }
      */
 
-    fn graph(&self) -> Graph<(usize,usize,usize)>{
-        let mut graph : Graph<(usize, usize, usize)> = HashMap::new();
+    fn graph(&self) -> Graph<(usize, usize, usize)> {
+        let mut graph: Graph<(usize, usize, usize)> = HashMap::new();
         for x in 0..self.board.size {
             for y in 0..self.board.size {
                 for z in 0..self.board.size {
                     if self.board.get(x, y, z) == Poss {
-                        let mut node = GraphNode { val: (x, y, z), conn: vec![] };
+                        let mut node = GraphNode {
+                            val: (x, y, z),
+                            conn: vec![],
+                        };
                         for i in self.get_weaks(x, y, z) {
                             match graph.get_mut(&i) {
                                 Some(n) => {
@@ -217,7 +226,7 @@ impl Puzzle<SdkStd> {
                                 None => {}
                             }
                         }
-                        graph.insert((x,y,z), node);
+                        graph.insert((x, y, z), node);
                     }
                 }
                 //println!("{}", graph.len());
@@ -226,7 +235,7 @@ impl Puzzle<SdkStd> {
         graph
     }
 
-    fn graph_strong(&self) -> Graph<(usize,usize,usize)> {
+    fn graph_strong(&self) -> Graph<(usize, usize, usize)> {
         let mut weak_graph = self.graph();
         let mut to_rem = Vec::new();
         for start in weak_graph.values() {
@@ -239,7 +248,7 @@ impl Puzzle<SdkStd> {
                 }
             }
         }
-        for (s,e) in to_rem {
+        for (s, e) in to_rem {
             //println!("({},{},{}),({},{},{})", s.0, s.1, s.2, e.0, e.1, e.2);
             weak_graph.get_mut(&s).unwrap().conn.retain(|x| *x != e);
             weak_graph.get_mut(&e).unwrap().conn.retain(|x| *x != s);
@@ -249,13 +258,13 @@ impl Puzzle<SdkStd> {
 
     // Basically just inference chain algorithm
     // Returns true if it did something
-    fn rem_odd_loops(&mut self, max: Option<usize>) -> bool{
+    fn rem_odd_loops(&mut self, max: Option<usize>) -> bool {
         let m = match max {
-            None => {20}
-            Some(e) => {e}
+            None => 20,
+            Some(e) => e,
         };
 
-        let mut min = m+1;
+        let mut min = m + 1;
         let mut to_rem = vec![];
 
         let wg = self.graph();
@@ -268,7 +277,7 @@ impl Puzzle<SdkStd> {
         for j in sg.values() {
             ssum += j.conn.len();
         }
-        println!("ln:{},{}", ssum/2, wsum/2);
+        println!("ln:{},{}", ssum / 2, wsum / 2);
         let mut succ = false;
         for (spos, s) in &wg {
             let mut visited = HashSet::new();
@@ -277,15 +286,17 @@ impl Puzzle<SdkStd> {
             'findloop: for i in 0..min {
                 let (graph, check_graph, csum) = if need_strong {
                     (&sg, &wg, wsum)
-                } else { (&wg, &sg, ssum) };
+                } else {
+                    (&wg, &sg, ssum)
+                };
                 need_strong = !need_strong;
                 let mut new_visit = HashSet::new();
                 {
                     for pos in &to_visit {
                         let pc = pos.clone();
                         let neighbors = &(graph.get(&pc).unwrap().conn);
-                        let (x_,y_,z_) = pos;
-                        self.get_weaks(*x_,*y_,*z_);
+                        let (x_, y_, z_) = pos;
+                        self.get_weaks(*x_, *y_, *z_);
                         //for i in self.get_weaks(*x_,*y_,*z_) {
                         //    print!("({},{},{}),",i.0,i.1,i.2);
                         //}
@@ -302,9 +313,16 @@ impl Puzzle<SdkStd> {
                 to_visit.drain();
                 let s2 = HashSet::from_iter(new_visit.iter().map(|x| x.to_owned()));
                 for v in &new_visit {
-                    let s1 = HashSet::<(usize,usize,usize)>::from_iter(check_graph.get(v).unwrap().conn.iter().map(|x| x.to_owned()));
-                    let inter : HashSet<_> = s1.intersection(&s2).collect();
-                    if inter.len()>0 {
+                    let s1 = HashSet::<(usize, usize, usize)>::from_iter(
+                        check_graph
+                            .get(v)
+                            .unwrap()
+                            .conn
+                            .iter()
+                            .map(|x| x.to_owned()),
+                    );
+                    let inter: HashSet<_> = s1.intersection(&s2).collect();
+                    if inter.len() > 0 {
                         //println!("From {}:({},{},{}), {}", i, v.0,v.1,v.2, csum/2);
                         /*
                         for i in inter {
@@ -312,12 +330,12 @@ impl Puzzle<SdkStd> {
                         }
                          */
                         //println!("Removes:({},{},{})", spos.0, spos.1, spos.2);
-                        if i<min {
+                        if i < min {
                             min = i;
                         }
-                        let (x,y,z) = spos;
+                        let (x, y, z) = spos;
                         //*(self.board.getm(*x,*y,*z)) = False;
-                        to_rem.push((i, (*x,*y,*z)));
+                        to_rem.push((i, (*x, *y, *z)));
                         succ = true;
                         break 'findloop;
                     }
@@ -325,10 +343,10 @@ impl Puzzle<SdkStd> {
                 to_visit = new_visit;
             }
         }
-        println!("{}",min);
-        for (i,(x,y,z)) in to_rem {
+        println!("{}", min);
+        for (i, (x, y, z)) in to_rem {
             if i <= min {
-                *(self.board.getm(x,y,z)) = False;
+                *(self.board.getm(x, y, z)) = False;
             }
         }
         succ
@@ -340,11 +358,11 @@ impl Display for Board<SdkStd> {
         for x in 0..self.size {
             for y in 0..self.size {
                 for z in 0..self.size {
-                    if self.get(x,y,z) == True {
-                        write!(f, "{} ", z+1)?;
+                    if self.get(x, y, z) == True {
+                        write!(f, "{} ", z + 1)?;
                         break;
                     }
-                    if z==(self.size-1) {
+                    if z == (self.size - 1) {
                         write!(f, "? ")?;
                     }
                 }
@@ -361,7 +379,7 @@ impl Debug for Board<SdkStd> {
             for y in 0..self.size {
                 write!(f, "[")?;
                 for z in 0..self.size {
-                    write!(f, "{:?},", *self.get(x,y,z))?;
+                    write!(f, "{:?},", *self.get(x, y, z))?;
                 }
                 write!(f, "]")?;
             }
