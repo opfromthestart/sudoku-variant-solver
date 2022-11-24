@@ -80,7 +80,7 @@ pub enum GameType {
 
 fn main() {
     let t = GameType::Futoshiki;
-    let size = 9;
+    let size = 5;
 
     let mut cons: Vec<Box<dyn Constraint<SdkStd>>> = vec![
         Box::new(RowConstraint),
@@ -113,58 +113,23 @@ fn main() {
         }
     } else if t == GameType::Futoshiki || t == GameType::Thermo {
         let pairs = vec![
-            ((1, 0), (0, 0)),
-            ((0, 4), (0, 3)),
-            ((0, 7), (0, 6)),
-            ((0, 7), (0, 8)),
-            ((1, 4), (1, 3)),
-            ((0, 6), (1, 6)),
-            ((1, 6), (1, 7)),
-            ((1, 8), (1, 7)),
-            ((2, 0), (2, 1)),
-            ((2, 2), (2, 1)),
-            ((2, 3), (2, 2)),
-            ((1, 5), (2, 5)),
-            ((2, 4), (2, 5)),
-            ((2, 5), (2, 6)),
-            ((2, 8), (2, 7)),
-            ((3, 1), (3, 2)),
-            ((3, 2), (3, 3)),
-            ((3, 4), (3, 3)),
-            ((2, 6), (3, 6)),
-            ((3, 5), (3, 6)),
-            ((4, 8), (3, 8)),
-            ((5, 0), (4, 0)),
-            ((4, 0), (4, 1)),
-            ((5, 3), (4, 3)),
-            ((4, 3), (4, 4)),
-            ((4, 4), (4, 5)),
-            ((3, 6), (4, 6)),
-            ((5, 8), (4, 8)),
-            ((5, 1), (5, 0)),
-            ((4, 2), (5, 2)),
-            ((6, 7), (5, 7)),
-            ((5, 7), (5, 8)),
-            ((6, 1), (6, 0)),
-            ((6, 2), (6, 1)),
-            ((6, 5), (6, 6)),
-            ((6, 6), (6, 7)),
-            ((6, 0), (7, 0)),
-            ((6, 3), (7, 3)),
-            ((7, 2), (7, 3)),
-            ((8, 4), (7, 4)),
-            ((7, 6), (7, 5)),
-            ((8, 2), (8, 1)),
-            ((8, 3), (8, 2)),
-            ((8, 6), (8, 5)),
-            ((7, 8), (8, 8)),
+            ((0,1),(0,2)),
+((2,2),(1,2)),
+((1,0),(2,0)),
+((1,1),(2,1)),
+((3,2),(2,2)),
+((2,4),(2,3)),
+((2,0),(3,0)),
+((4,1),(4,2)),
+((4,3),(4,2)),
+((4,4),(4,3)),
         ];
         for (l, h) in pairs {
             cons.push(Box::new(LessThanConstraint { lpos: l, hpos: h }));
         }
     }
 
-    let givens = vec![(0, 2, 4), (0, 5, 7), (1, 2, 0), (7, 7, 6), (8, 7, 8)];
+    let givens = vec![(1,3,3),];
     for i in givens {
         cons.push(Box::new(GivenConstraint { pos: i }));
     }
@@ -172,13 +137,18 @@ fn main() {
     let mut game = Puzzle::init(size);
     game.constraints = cons;
 
+    game.solve();
+    println!("{}", game.weak_hint());
+
     while game.solve() {
 
-        //println!("{}", game.board);
-        //println!("{:?}", game.board);
+        println!("{}", game.board);
+        println!("{:?}", game.board);
     }
 
     println!("{}", game.board);
     println!("{:?}", game.board);
     println!("document.getElementById(\"puzzleForm\").onsubmit = function() {{Game.saveState();Game.tickTimer();this.jstimerPersonal.value = Game.getTimer();this.ansH.value=\"{}\"}};\ndocument.getElementById(\"btnReady\").click();", game.board.serialize().unwrap());
+
+
 }

@@ -83,6 +83,32 @@ impl Board<SdkStd> {
         }
         Some(s)
     }
+
+    pub fn num_solved(&self) -> usize {
+        let mut num = 0;
+        for x in 0..self.size {
+            for y in 0..self.size {
+                for z in 0..self.size {
+                    match self.get(x, y, z) {
+                        True => {num += 1}
+                        _ => {}
+                    }
+                }
+            }
+        }
+        num
+    }
+}
+
+impl Clone for Board<SdkStd> {
+    fn clone(&self) -> Self {
+        Board{ data: self.data.clone(), size: self.size}
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        self.data = source.data.clone();
+        self.size = source.size;
+    }
 }
 
 impl Puzzle<SdkStd> {
@@ -158,10 +184,35 @@ impl Puzzle<SdkStd> {
         match did {
             true => true,
             false => {
-                println!("Try loops");
-                self.rem_odd_loops(None)
+                eprintln!("Try loops");
+                self.rem_odd_loops(None).0
             }
         }
+    }
+
+    pub(crate) fn weak_hint(&mut self) -> String {
+        let mut backup = self.board.clone();
+        let start = self.board.num_solved();
+        while self.board.num_solved() == start {
+            let did = self.solve();
+            if !did {
+                self.board = backup;
+                return String::from("No hint found");
+            }
+        }
+        for x in 0..self.board.size {
+            for y in 0..self.board.size {
+                for z in 0..self.board.size {
+                    if self.board.get(x, y, z) == True && backup.get(x, y, z) == Poss {
+                        let row = char::from(65+(x as u8));
+                        self.board = backup;
+                        return format!("Consider cell {}{}.", row, y+1)
+                    }
+                }
+            }
+        }
+        self.board = backup;
+        panic!("Cell filled, but not found.");
     }
 
     fn get_weaks(&self, x: usize, y: usize, z: usize) -> HashSet<(usize, usize, usize)> {
@@ -170,10 +221,10 @@ impl Puzzle<SdkStd> {
             let temp = con.affects(&self.board, x, y, z);
             /*
             for i in &temp {
-                print!("({},{},{}),", i.0,i.1,i.2);
+                eprint!("({},{},{}),", i.0,i.1,i.2);
             }
             if temp.len()>0 {
-                println!();
+                eprintln!();
             }
 
              */
@@ -229,7 +280,7 @@ impl Puzzle<SdkStd> {
                         graph.insert((x, y, z), node);
                     }
                 }
-                //println!("{}", graph.len());
+                //eprintln!("{}", graph.len());
             }
         }
         graph
@@ -242,14 +293,14 @@ impl Puzzle<SdkStd> {
             for long1 in &start.conn {
                 for long2 in &(weak_graph.get(long1).unwrap().conn) {
                     if start.conn.contains(long2) {
-                        //println!("({},{},{}),({},{},{}),({},{},{})", start.val.0, start.val.1, start.val.2, long1.0, long1.1, long1.2, long2.0, long2.1, long2.2);
+                        //eprintln!("({},{},{}),({},{},{}),({},{},{})", start.val.0, start.val.1, start.val.2, long1.0, long1.1, long1.2, long2.0, long2.1, long2.2);
                         to_rem.push((start.val, long1.to_owned()));
                     }
                 }
             }
         }
         for (s, e) in to_rem {
-            //println!("({},{},{}),({},{},{})", s.0, s.1, s.2, e.0, e.1, e.2);
+            //eprintln!("({},{},{}),({},{},{})", s.0, s.1, s.2, e.0, e.1, e.2);
             weak_graph.get_mut(&s).unwrap().conn.retain(|x| *x != e);
             weak_graph.get_mut(&e).unwrap().conn.retain(|x| *x != s);
         }
@@ -258,7 +309,7 @@ impl Puzzle<SdkStd> {
 
     // Basically just inference chain algorithm
     // Returns true if it did something
-    fn rem_odd_loops(&mut self, max: Option<usize>) -> bool {
+    fn rem_odd_loops(&mut self, max: Option<usize>) -> (bool, usize) {
         let m = match max {
             None => 20,
             Some(e) => e,
@@ -277,7 +328,7 @@ impl Puzzle<SdkStd> {
         for j in sg.values() {
             ssum += j.conn.len();
         }
-        println!("ln:{},{}", ssum / 2, wsum / 2);
+        eprintln!("ln:{},{}", ssum / 2, wsum / 2);
         let mut succ = false;
         for (spos, s) in &wg {
             let mut visited = HashSet::new();
@@ -298,12 +349,12 @@ impl Puzzle<SdkStd> {
                         let (x_, y_, z_) = pos;
                         self.get_weaks(*x_, *y_, *z_);
                         //for i in self.get_weaks(*x_,*y_,*z_) {
-                        //    print!("({},{},{}),",i.0,i.1,i.2);
+                        //    eprint!("({},{},{}),",i.0,i.1,i.2);
                         //}
                         for n in neighbors {
                             let nc = n.clone();
                             if !visited.contains(&nc) && !to_visit.contains(&nc) {
-                                //println!("visit {}: ({},{},{}),({},{},{})", i, pc.0,pc.1,pc.2, nc.0,nc.1,nc.2);
+                                //eprintln!("visit {}: ({},{},{}),({},{},{})", i, pc.0,pc.1,pc.2, nc.0,nc.1,nc.2);
                                 new_visit.insert(nc);
                             }
                         }
@@ -323,13 +374,13 @@ impl Puzzle<SdkStd> {
                     );
                     let inter: HashSet<_> = s1.intersection(&s2).collect();
                     if inter.len() > 0 {
-                        //println!("From {}:({},{},{}), {}", i, v.0,v.1,v.2, csum/2);
+                        //eprintln!("From {}:({},{},{}), {}", i, v.0,v.1,v.2, csum/2);
                         /*
                         for i in inter {
-                            println!("({},{},{})", i.0,i.1,i.2);
+                            eprintln!("({},{},{})", i.0,i.1,i.2);
                         }
                          */
-                        //println!("Removes:({},{},{})", spos.0, spos.1, spos.2);
+                        //eprintln!("Removes:({},{},{})", spos.0, spos.1, spos.2);
                         if i < min {
                             min = i;
                         }
@@ -343,13 +394,13 @@ impl Puzzle<SdkStd> {
                 to_visit = new_visit;
             }
         }
-        println!("{}", min);
+        eprintln!("{}", min);
         for (i, (x, y, z)) in to_rem {
             if i <= min {
                 *(self.board.getm(x, y, z)) = False;
             }
         }
-        succ
+        (succ, min)
     }
 }
 
