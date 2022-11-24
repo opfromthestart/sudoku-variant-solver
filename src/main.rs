@@ -113,23 +113,23 @@ fn main() {
         }
     } else if t == GameType::Futoshiki || t == GameType::Thermo {
         let pairs = vec![
-            ((0,1),(0,2)),
-((2,2),(1,2)),
-((1,0),(2,0)),
-((1,1),(2,1)),
-((3,2),(2,2)),
-((2,4),(2,3)),
-((2,0),(3,0)),
-((4,1),(4,2)),
-((4,3),(4,2)),
-((4,4),(4,3)),
+            ((0,2),(0,3)),
+((0,3),(0,4)),
+((0,1),(1,1)),
+((1,2),(1,3)),
+((0,4),(1,4)),
+((2,0),(2,1)),
+((1,3),(2,3)),
+((3,4),(2,4)),
+((4,1),(3,1)),
+((4,2),(3,2)),
         ];
         for (l, h) in pairs {
             cons.push(Box::new(LessThanConstraint { lpos: l, hpos: h }));
         }
     }
 
-    let givens = vec![(1,3,3),];
+    let givens = vec![];
     for i in givens {
         cons.push(Box::new(GivenConstraint { pos: i }));
     }
@@ -137,15 +137,18 @@ fn main() {
     let mut game = Puzzle::init(size);
     game.constraints = cons;
 
-    game.solve();
-    println!("{}", game.weak_hint());
+    //println!("{}", game.weak_hint());
 
-    while game.solve() {
-
-        println!("{}", game.board);
-        println!("{:?}", game.board);
+    let mut tries = 0;
+    while game.solve_simple() {
+        tries += 1;
+        //println!("{}", game.board);
+        //println!("{:?}", game.board);
+        //println!("{}", tries);
     }
+    println!("{}", game.strong_hint());
 
+    println!("Rounds of filling: {}", tries);
     println!("{}", game.board);
     println!("{:?}", game.board);
     println!("document.getElementById(\"puzzleForm\").onsubmit = function() {{Game.saveState();Game.tickTimer();this.jstimerPersonal.value = Game.getTimer();this.ansH.value=\"{}\"}};\ndocument.getElementById(\"btnReady\").click();", game.board.serialize().unwrap());

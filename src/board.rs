@@ -123,9 +123,10 @@ impl Puzzle<SdkStd> {
         s
     }
 
-    fn set_trues(&mut self, x: usize, y: usize) {
+    fn set_trues(&mut self, x: usize, y: usize) -> bool {
         let mut can_fill = 0;
         let mut digit = self.board.size;
+        let mut did = false;
         for z in 0..self.board.size {
             let r = self.board.get(x, y, z);
             if r != False {
@@ -137,8 +138,8 @@ impl Puzzle<SdkStd> {
             }
         }
         if can_fill == 1 {
+            did = self.board.get(x,y,digit) == Poss;
             *(self.board.getm(x, y, digit)) = True;
-            return;
         }
         can_fill = 0;
         for z in 0..self.board.size {
@@ -152,8 +153,8 @@ impl Puzzle<SdkStd> {
             }
         }
         if can_fill == 1 {
+            did = did || self.board.get(x,digit,y) == Poss;
             *(self.board.getm(x, digit, y)) = True;
-            return;
         }
         can_fill = 0;
         for z in 0..self.board.size {
@@ -167,23 +168,35 @@ impl Puzzle<SdkStd> {
             }
         }
         if can_fill == 1 {
+            did = did || self.board.get(digit,y,x) == Poss;
             *(self.board.getm(digit, y, x)) = True;
         }
+        did
     }
 
-    pub(crate) fn solve(&mut self) -> bool {
+    pub(crate) fn solve_simple(&mut self) -> bool {
+        let mut did = false;
         for x in 0..self.board.size {
             for y in 0..self.board.size {
-                self.set_trues(x, y);
+                did = self.set_trues(x, y) || did;
             }
         }
-        let mut did = false;
+        if did {
+            return true;
+        }
         for con in &self.constraints {
             did = con.apply(&mut self.board) || did;
         }
-        match did {
+        did
+    }
+
+    pub(crate) fn solve(&mut self) -> bool {
+        match self.solve_simple() {
             true => true,
             false => {
+                if self.board.num_solved() == self.board.size*self.board.size {
+                    return false;
+                }
                 eprintln!("Try loops");
                 self.rem_odd_loops(None).0
             }
@@ -211,6 +224,83 @@ impl Puzzle<SdkStd> {
                 }
             }
         }
+        self.board = backup;
+        panic!("Cell filled, but not found.");
+    }
+
+    pub(crate) fn strong_hint(&mut self) -> String {
+        let mut backup = self.board.clone();
+        let start = self.board.num_solved();
+        while self.board.num_solved() == start {
+            let did = self.solve_simple();
+            if !did {
+                break;
+            }
+        }
+        for x in 0..self.board.size {
+            for y in 0..self.board.size {
+                for z in 0..self.board.size {
+                    if self.board.get(x, y, z) == True && backup.get(x, y, z) == Poss {
+                        let row = char::from(65 + (x as u8));
+                        self.board = backup;
+                        return format!("Consider cell {}{}.", row, y + 1)
+                    }
+                }
+            }
+        }
+        let mut cycles = vec![];
+        while self.board.num_solved() == start {
+            let (l, v) = self.find_odd_loops(None);
+            cycles.extend(v);
+            if !self.solve() {
+                self.board = backup;
+                return String::from("No hint found.");
+            }
+        }
+        fn match2(a : &(usize, usize, usize), b : &(usize, usize, usize)) -> bool {
+            let (ax, ay, az) = a.to_owned();
+            let (bx, by, bz) = b.to_owned();
+            if ax==bx && ay==by {
+                return true;
+            }
+            if ax==bx && az==bz {
+                return true;
+            }
+            ay==by && az==bz
+        }
+
+        for x in 0..self.board.size {
+                for y in 0..self.board.size {
+                    for z in 0..self.board.size {
+                        if self.board.get(x, y, z) == True && backup.get(x, y, z) == Poss {
+                            let row = char::from(65 + (x as u8));
+                            eprintln!("{},{},{}", x, y, z);
+                            for c in &cycles {
+                                eprint!("{:?}", c);
+                            }
+                            eprintln!();
+                            let matched_paths : Vec<Vec<_>> = cycles.iter()
+                                .filter(|v : &&Vec<(usize, usize, usize)>| v.iter().any(|b| match2(&(x,y,z), b)))
+                                .map(|v| v.iter().map(|(x,y,z)| (*x,*y)).collect()).collect();
+                            eprintln!("len:{}", matched_paths.len());
+                            //let consider_paths : Vec<_> = all_paths
+                            //eprintln!("len2:{}", &consider_paths.len());
+                            self.board = backup;
+                            let mut ret_str = format!("{}{}, \n", row, y+1);
+                            for path in matched_paths {
+                                let path_r : HashSet<_> = path.iter().collect();
+                                for cell in path_r {
+                                    //eprintln!("{:?}", cell);
+                                    let row = char::from(65 + (cell.0 as u8));
+                                    ret_str += &*format!("{}{}, ", row, cell.1);
+                                }
+                                ret_str += "\n";
+                            }
+                            return format!("Consider cells {}", ret_str)
+                        }
+                    }
+                }
+            }
         self.board = backup;
         panic!("Cell filled, but not found.");
     }
@@ -307,8 +397,8 @@ impl Puzzle<SdkStd> {
         weak_graph
     }
 
-    // Basically just inference chain algorithm
-    // Returns true if it did something
+    /// Basically just inference chain algorithm
+    /// Returns true if it did something
     fn rem_odd_loops(&mut self, max: Option<usize>) -> (bool, usize) {
         let m = match max {
             None => 20,
@@ -401,6 +491,138 @@ impl Puzzle<SdkStd> {
             }
         }
         (succ, min)
+    }
+
+    /// Does rem_odd_loops but is able to backtrack.
+    fn find_odd_loops(&self, max: Option<usize>) -> (usize, Vec<Vec<(usize, usize, usize)>>) {
+        let m = match max {
+            None => 20,
+            Some(e) => e,
+        };
+
+        let mut min = m + 1;
+        let mut to_rem = vec![];
+
+        let wg = self.graph();
+        let sg = self.graph_strong();
+        let mut wsum = 0;
+        for j in wg.values() {
+            wsum += j.conn.len();
+        }
+        let mut ssum = 0;
+        for j in sg.values() {
+            ssum += j.conn.len();
+        }
+        eprintln!("ln:{},{}", ssum / 2, wsum / 2);
+        let mut succ = false;
+        for (spos, s) in &wg {
+            let mut visited = HashMap::new();
+            let mut to_visit = HashMap::from([(*spos, None)]);
+            let mut need_strong = false;
+            let mut min_i = min;
+            let mut ends = (None,None);
+            'findloop: for i in 0..min {
+                let (graph, check_graph, csum) = if need_strong {
+                    (&sg, &wg, wsum)
+                } else {
+                    (&wg, &sg, ssum)
+                };
+                need_strong = !need_strong;
+                let mut new_visit = HashMap::new();
+                {
+                    for (pos, prev) in &to_visit {
+                        let pc = pos.clone();
+                        let neighbors = &(graph.get(&pc).unwrap().conn);
+                        let (x_, y_, z_) = pos;
+                        self.get_weaks(*x_, *y_, *z_);
+                        //for i in self.get_weaks(*x_,*y_,*z_) {
+                        //    eprint!("({},{},{}),",i.0,i.1,i.2);
+                        //}
+                        for n in neighbors {
+                            let nc = n.clone();
+                            if !visited.contains_key(&nc) && !to_visit.contains_key(&nc) {
+                                //eprintln!("visit {}: ({},{},{}),({},{},{})", i, pc.0,pc.1,pc.2, nc.0,nc.1,nc.2);
+                                new_visit.insert(nc, Some(pc));
+                            }
+                        }
+                        visited.insert(pc, *prev);
+                    }
+                }
+                to_visit.drain();
+
+                /// Checks to see if it can finish a loop
+                let s2 : HashSet<(usize, usize, usize)> = HashSet::from_iter(new_visit.iter().map(|(x, y)| x.to_owned()));
+                for v in &new_visit {
+                    let s1 = HashSet::<(usize, usize, usize)>::from_iter(
+                        check_graph
+                            .get(&v.0)
+                            .unwrap()
+                            .conn
+                            .iter()
+                            .map(|x| x.to_owned()),
+                    );
+                    let inter: HashSet<_> = s1.intersection(&s2).collect();
+                    if inter.len() > 0 {
+                        //eprintln!("From {}:({},{},{}), {}", i, v.0,v.1,v.2, csum/2);
+                        /*
+                        for i in inter {
+                            eprintln!("({},{},{})", i.0,i.1,i.2);
+                        }
+                         */
+                        //eprintln!("Removes:({},{},{})", spos.0, spos.1, spos.2);
+                        if i < min {
+                            min = i;
+                        }
+                        //let (x, y, z) = spos;
+                        //*(self.board.getm(*x,*y,*z)) = False;
+                        //to_rem.push((i, (*x, *y, *z)));
+                        let mut w = None;
+                        for i in inter {
+                            w = Some(*i);
+                            break;
+                        }
+                        min_i = i;
+                        succ = true;
+                        ends = (Some(v.0.to_owned()), w);
+                        visited.extend(new_visit.iter());
+                        break 'findloop;
+                    }
+                }
+                to_visit = new_visit;
+            }
+            if let (Some(v), Some(w)) = ends {
+                let mut ret = vec![];
+                let mut pnt = Some(v.clone());
+                while let Some(p) = pnt {
+                    if visited.contains_key(&p) {
+                        pnt = *visited.get(&p).unwrap();
+                    }
+                    else if to_visit.contains_key(&p) {
+                        pnt = *to_visit.get(&p).unwrap();
+                    }
+                    ret.push(p);
+                }
+                let mut pnt = Some(w.clone());
+                while let Some(p) = pnt {
+                    if visited.contains_key(&p) {
+                        pnt = *visited.get(&p).unwrap();
+                    }
+                    else if to_visit.contains_key(&p) {
+                        pnt = *to_visit.get(&p).unwrap();
+                    }
+                    ret.push(p);
+                }
+                to_rem.push((min_i,ret));
+            }
+        }
+        eprintln!("{}", min);
+        let mut ret = vec![];
+        for (i, v) in to_rem {
+            if i <= min {
+                ret.push( v);
+            }
+        }
+        (min,ret)
     }
 }
 
