@@ -2,7 +2,7 @@ use crate::board::SdkStd::{False, Poss, True};
 use crate::board::{Board, Puzzle, SdkStd};
 
 // A constraint can only remove a possibility/pencil mark
-pub trait Constraint<S> {
+pub(crate) trait Constraint<S>{
     // Remove all illegal pencil marks
     fn apply(&self, board: &mut Board<S>) -> bool;
 
@@ -13,6 +13,17 @@ pub trait Constraint<S> {
 }
 
 pub struct RowConstraint;
+
+impl Clone for RowConstraint {
+    fn clone(&self) -> Self {
+        RowConstraint
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        *(self) = RowConstraint;
+    }
+}
+
 impl Constraint<SdkStd> for RowConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let mut did = false;
@@ -61,6 +72,17 @@ impl Constraint<SdkStd> for RowConstraint {
 }
 
 pub struct ColConstraint;
+
+impl Clone for ColConstraint {
+    fn clone(&self) -> Self {
+        ColConstraint
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        *(self) = ColConstraint;
+    }
+}
+
 impl Constraint<SdkStd> for ColConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let mut did = false;
@@ -109,6 +131,17 @@ impl Constraint<SdkStd> for ColConstraint {
 }
 
 pub struct DigitConstraint;
+
+impl Clone for DigitConstraint {
+    fn clone(&self) -> Self {
+        DigitConstraint
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        *(self) = DigitConstraint;
+    }
+}
+
 impl Constraint<SdkStd> for DigitConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let mut did = false;
@@ -159,6 +192,17 @@ impl Constraint<SdkStd> for DigitConstraint {
 pub struct CellConstraint {
     pub(crate) cells: Vec<(usize, usize)>,
 }
+
+impl Clone for CellConstraint {
+    fn clone(&self) -> Self {
+        CellConstraint{ cells : self.cells.clone()}
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        self.cells = source.cells.clone();
+    }
+}
+
 impl Constraint<SdkStd> for CellConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let mut did = false;
@@ -207,6 +251,17 @@ impl Constraint<SdkStd> for CellConstraint {
 pub struct GivenConstraint {
     pub(crate) pos: (usize, usize, usize),
 }
+
+impl Clone for GivenConstraint {
+    fn clone(&self) -> Self {
+        GivenConstraint{pos: self.pos}
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        self.pos = source.pos;
+    }
+}
+
 impl Constraint<SdkStd> for GivenConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let (x, y, z) = self.pos;
@@ -230,6 +285,18 @@ pub struct LessThanConstraint {
     pub(crate) lpos: (usize, usize),
     pub(crate) hpos: (usize, usize),
 }
+
+impl Clone for LessThanConstraint {
+    fn clone(&self) -> Self {
+        LessThanConstraint{lpos: self.lpos, hpos: self.hpos}
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        self.lpos = source.lpos;
+        self.hpos = source.hpos;
+    }
+}
+
 impl Constraint<SdkStd> for LessThanConstraint {
     fn apply(&self, board: &mut Board<SdkStd>) -> bool {
         let (xl, yl) = self.lpos;
