@@ -140,7 +140,7 @@ fn main() {
     //println!("{}", game.weak_hint());
 
     let mut tries = 0;
-    while game.solve_simple() {
+    while game.solve_simple(false) {
         tries += 1;
         //println!("{}", game.board);
         //println!("{:?}", game.board);
