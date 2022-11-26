@@ -1,9 +1,6 @@
-use crate::board::SdkStd::False;
-use crate::board::{Puzzle, SdkStd};
-use crate::constraints::{
-    CellConstraint, ColConstraint, Constraint, DigitConstraint, GivenConstraint,
-    LessThanConstraint, RowConstraint,
-};
+use crate::board::LogicVal::False;
+use crate::board::{Puzzle, LogicVal, SdkBoard};
+use crate::constraints::{CellConstraint, ColExistConstraint, ColUniqueConstraint, Constraint, DigitExistConstraint, DigitUniqueConstraint, GivenConstraint, LessThanConstraint, RowExistConstraint, RowUniqueConstraint};
 
 mod board;
 mod constraints;
@@ -80,12 +77,15 @@ pub enum GameType {
 
 fn main() {
     let t = GameType::Futoshiki;
-    let size = 5;
+    const size : usize = 5;
 
-    let mut cons: Vec<Box<dyn Constraint<SdkStd>>> = vec![
-        Box::new(RowConstraint),
-        Box::new(ColConstraint),
-        Box::new(DigitConstraint),
+    let mut cons: Vec<Box<dyn Constraint<_, SdkBoard<size>>>> = vec![
+        Box::new(RowUniqueConstraint),
+        Box::new(ColUniqueConstraint),
+        Box::new(DigitUniqueConstraint),
+        Box::new(RowExistConstraint),
+        Box::new(ColExistConstraint),
+        Box::new(DigitExistConstraint),
     ];
 
     if t == GameType::Normal {
@@ -140,13 +140,13 @@ fn main() {
     //println!("{}", game.weak_hint());
 
     let mut tries = 0;
-    while game.solve_simple(false) {
+    while game.solve(false) {
         tries += 1;
         //println!("{}", game.board);
         //println!("{:?}", game.board);
         //println!("{}", tries);
     }
-    println!("{}", game.strong_hint());
+    //println!("{}", game.strong_hint());
 
     println!("Rounds of filling: {}", tries);
     println!("{}", game.board);
