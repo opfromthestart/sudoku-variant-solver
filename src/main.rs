@@ -1,5 +1,5 @@
 use crate::board::LogicVal::False;
-use crate::board::{Puzzle, LogicVal, SdkBoard};
+use crate::board::{Puzzle, LogicVal, SdkBoard, Tuple3D};
 use crate::constraints::{CellConstraint, ColExistConstraint, ColUniqueConstraint, Constraint, DigitExistConstraint, DigitUniqueConstraint, GivenConstraint, LessThanConstraint, RowExistConstraint, RowUniqueConstraint};
 
 mod board;
@@ -75,6 +75,20 @@ pub enum GameType {
     Thermo,
 }
 
+fn get_hint_string<const SIZE: usize>(vec: &Vec<Tuple3D<SIZE>>) -> String{
+    let mut ret_str = String::new();
+    for pos in vec {
+        let row = char::from(65 + (pos.pos.0 as u8));
+        ret_str += &*format!("{}{}, ", row, pos.pos.1 + 1);
+    }
+    if vec.len() <= 1 {
+        format!("Consider cell: {}", ret_str)
+    }
+    else {
+        format!("Consider cells: {}", ret_str)
+    }
+}
+
 fn main() {
     let t = GameType::Futoshiki;
     const size : usize = 5;
@@ -137,16 +151,16 @@ fn main() {
     let mut game = Puzzle::init(size);
     game.constraints = cons;
 
-    //println!("{}", game.weak_hint());
+    println!("{}", get_hint_string(&vec![game.weak_hint().unwrap()]));
 
     let mut tries = 0;
-    while game.solve(false) {
+    while game.solve_simple(false) {
         tries += 1;
         //println!("{}", game.board);
         //println!("{:?}", game.board);
         //println!("{}", tries);
     }
-    //println!("{}", game.strong_hint());
+    println!("{}", get_hint_string(&game.strong_hint()));
 
     println!("Rounds of filling: {}", tries);
     println!("{}", game.board);

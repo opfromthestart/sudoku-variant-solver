@@ -332,6 +332,7 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
             cycles.extend(v);
             if !self.solve(true) {
                 self.board = backup;
+                eprintln!("Not able to solve");
                 //return String::from("No hint found.");
                 return vec![];
             }
@@ -345,6 +346,8 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
                 //    eprint!("{:?}", c);
                 //}
                 //eprintln!();
+                self.board = backup;
+
                 let matched_paths: Vec<&Vec<_>> = cycles.iter()
                     .filter(|v: &&Vec<T>| v.iter().any(|b| self.get_weaks(&pos).contains(b))).collect();
                 /*
@@ -356,7 +359,6 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
                 //eprintln!("len:{}", matched_paths.len());
                 //let consider_paths : Vec<_> = all_paths
                 //eprintln!("len2:{}", &consider_paths.len());
-                self.board = backup;
                 //let mut ret_str = format!("{}{}, \n", row, y + 1);
                 let mut ret_vec = vec![];
                 for path in matched_paths {
