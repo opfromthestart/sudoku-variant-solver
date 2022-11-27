@@ -59,6 +59,8 @@ pub trait Enumerable {
     fn positions() -> Vec<Self> where Self: Sized;
 }
 
+
+#[derive(Debug)]
 pub struct Tuple3D<const MAX: usize> {
     pub(crate) pos : (usize, usize, usize)
 }
@@ -112,6 +114,67 @@ impl<const MAX:usize> Clone for Tuple3D<MAX> {
 impl<const MAX: usize> Copy for Tuple3D<MAX> {
 
 }
+
+
+pub struct PosOnOff<const MAX: usize> {
+    pub(crate) pos : (usize, usize, bool)
+}
+
+impl<const MAX: usize> From<(usize, usize, bool)> for PosOnOff<MAX> {
+    fn from(v: (usize, usize, bool)) -> Self {
+        Self {pos : v}
+    }
+}
+
+impl<const SIZE: usize> Hash for PosOnOff<SIZE> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.pos.hash(state);
+    }
+}
+
+impl<const SIZE: usize>  PartialEq<Self> for PosOnOff<SIZE> {
+    fn eq(&self, other: &Self) -> bool {
+        self.pos == other.pos
+    }
+}
+
+impl<const SIZE: usize> Eq for PosOnOff<SIZE> {
+
+}
+
+impl<const MAX: usize> Enumerable for PosOnOff<MAX> {
+    fn positions() -> Vec<Self> {
+        let mut ret = Vec::new();
+        for x in 0..MAX {
+            for y in 0..MAX {
+                ret.push(PosOnOff::<MAX>::from((x, y, true)));
+                ret.push(PosOnOff::<MAX>::from((x, y, false)));
+            }
+        }
+        ret
+    }
+}
+
+impl<const MAX:usize> Clone for PosOnOff<MAX> {
+    fn clone(&self) -> Self {
+        Self{pos: self.pos}
+    }
+
+    fn clone_from(&mut self, source: &Self) where Self: {
+        self.pos = source.pos;
+    }
+}
+
+impl<const MAX: usize> Copy for PosOnOff<MAX> {
+
+}
+
+impl<const MAX: usize> Debug for PosOnOff<MAX> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.pos)
+    }
+}
+
 
 pub trait Board<T : Eq + Hash + Enumerable> {
     fn getm(&mut self, x: &T) -> &mut LogicVal;
@@ -187,6 +250,99 @@ impl<const SIZE: usize> Board<Tuple3D<SIZE>> for SdkBoard<SIZE> {
     fn clone(&self) -> Self {
         SdkBoard{ data: self.data.clone()}
     }
+}
+
+pub struct TFBoard<const SIZE: usize> {
+    pub data : Vec<LogicVal>
+}
+
+impl<const SIZE:usize> Board<PosOnOff<SIZE>> for TFBoard<SIZE> {
+    fn getm(&mut self, v: &PosOnOff<SIZE>) -> &mut LogicVal {
+        let z = match v.pos.2 {
+            true => 1,
+            false => 0,
+        };
+        self.data[v.pos.0*SIZE*2+v.pos.1*2+z].borrow_mut()
+    }
+
+    fn get(&self, v: &PosOnOff<SIZE>) -> &LogicVal {
+        let z = match v.pos.2 {
+            true => 1,
+            false => 0,
+        };
+        &self.data[v.pos.0*SIZE*2+v.pos.1*2+z]
+    }
+
+    fn num_solved(&self) -> usize {
+        let mut num = 0;
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                for z in [true, false] {
+                    match self.get(&PosOnOff::from((x, y, z))) {
+                        True => {num += 1}
+                        _ => {}
+                    }
+                }
+            }
+        }
+        num
+    }
+
+    fn max_solved(&self) -> usize {
+        SIZE*SIZE
+    }
+
+    fn clone(&self) -> Self {
+        Self { data : self.data.clone()}
+    }
+}
+
+pub fn get_empty<S : Board<Tuple3D<SIZE>>, const SIZE:usize>(board: &S) -> Option<Tuple3D<SIZE>> {
+    for x in 0..SIZE {
+        for y in 0..SIZE {
+            let mut row_has = false;
+            let mut col_has = false;
+            let mut digit_has = false;
+            for z in 0..SIZE {
+                if board.get(&Tuple3D::from((x,y,z))) != False {
+                    digit_has = true;
+                }
+                if board.get(&Tuple3D::from((x,z,y))) != False {
+                    row_has = true;
+                }
+                if board.get(&Tuple3D::from((z,x,y))) != False {
+                    col_has = true;
+                }
+            }
+            if !row_has {
+                return Some(Tuple3D::from((x,y,SIZE)));
+            }
+            if !col_has {
+                return Some(Tuple3D::from((x,SIZE,y)));
+            }
+            if !digit_has {
+                return Some(Tuple3D::from((SIZE,x,y)));
+            }
+        }
+    }
+    None
+}
+
+pub fn get_empty_pos<S : Board<PosOnOff<SIZE>>, const SIZE:usize>(board: &S) -> Option<PosOnOff<SIZE>> {
+    for x in 0..SIZE {
+        for y in 0..SIZE {
+            let mut digit_has = false;
+            for z in [true, false] {
+                if board.get(&PosOnOff::from((x,y,z))) != False {
+                    digit_has = true;
+                }
+            }
+            if !digit_has {
+                return Some(PosOnOff::from((x,y,true)));
+            }
+        }
+    }
+    None
 }
 
 impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
@@ -580,7 +736,7 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
     /// Does rem_odd_loops but is able to backtrack.
     /// @param max: max number of iterations to try
     /// @param slow: whether to do only one removal per call. Is not for efficiency
-    fn find_odd_loops(&self, max: Option<usize>, slow : bool) -> (usize, Vec<Vec<T>>) {
+    pub(crate) fn find_odd_loops(&self, max: Option<usize>, slow : bool) -> (usize, Vec<Vec<T>>) {
         let m = match max {
             None => 20,
             Some(e) => e,
@@ -731,6 +887,98 @@ impl<const SIZE: usize>  Puzzle<Tuple3D<SIZE>, SdkBoard<SIZE>> {
         };
         s
     }
+
+    pub(crate) fn solve_simple_debug(&mut self, slow: bool) -> bool {
+        let mut did = false;
+        for con in &self.constraints {
+            if !slow {
+                did = con.apply(&mut self.board) || did;
+                if let Some(v) = get_empty(&self.board) {
+                    eprintln!("{}", self.board);
+                    eprintln!("{:?}", self.board);
+                    eprintln!("{:?}", v);
+                    panic!("{:?}",con);
+                }
+            }
+            else {
+                did = did || con.apply(&mut self.board);
+                if let Some(v) = get_empty(&self.board) {
+                    eprintln!("{}", self.board);
+                    eprintln!("{:?}", self.board);
+                    eprintln!("{:?}", v);
+                    panic!("{:?}",con);
+                }
+            }
+        }
+        did
+    }
+
+    /// One iteration of attempting to solve the puzzle
+    pub(crate) fn solve_debug(&mut self, slow: bool) -> bool {
+        match self.solve_simple_debug(slow) {
+            true => true,
+            false => {
+                if self.board.num_solved() == self.board.max_solved() {
+                    return false;
+                }
+                eprintln!("Try loops");
+                self.rem_odd_loops(None, slow).0
+            }
+        }
+    }
+}
+
+impl<const SIZE: usize>  Puzzle<PosOnOff<SIZE>, TFBoard<SIZE>> {
+    pub(crate) fn init(size: usize) -> Self
+    {
+        let s = Self {
+            board: TFBoard {
+                data: vec![Poss; size * size * 2],
+            },
+            constraints: vec![],
+            hasher: RandomState::new(),
+        };
+        s
+    }
+
+    pub(crate) fn solve_simple_debug(&mut self, slow: bool) -> bool {
+        let mut did = false;
+        for con in &self.constraints {
+            if !slow {
+                did = con.apply(&mut self.board) || did;
+                if let Some(v) = get_empty_pos(&self.board) {
+                    eprintln!("{}", self.board);
+                    eprintln!("{:?}", self.board);
+                    eprintln!("{:?}", v);
+                    panic!("{:?}",con);
+                }
+            }
+            else {
+                did = did || con.apply(&mut self.board);
+                if let Some(v) = get_empty_pos(&self.board) {
+                    eprintln!("{}", self.board);
+                    eprintln!("{:?}", self.board);
+                    eprintln!("{:?}", v);
+                    panic!("{:?}",con);
+                }
+            }
+        }
+        did
+    }
+
+    /// One iteration of attempting to solve the puzzle
+    pub(crate) fn solve_debug(&mut self, slow: bool) -> bool {
+        match self.solve_simple_debug(slow) {
+            true => true,
+            false => {
+                if self.board.num_solved() == self.board.max_solved() {
+                    return false;
+                }
+                eprintln!("Try loops");
+                self.rem_odd_loops(None, slow).0
+            }
+        }
+    }
 }
 
 impl<const SIZE: usize>  Display for SdkBoard<SIZE> {
@@ -760,6 +1008,45 @@ impl<const SIZE: usize>  Debug for SdkBoard<SIZE> {
                 write!(f, "[")?;
                 for z in 0..SIZE {
                     write!(f, "{:?},", *self.get(&Tuple3D::from((x, y, z))))?;
+                }
+                write!(f, "]")?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
+impl<const SIZE: usize>  Display for TFBoard<SIZE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                for z in [true, false] {
+                    if self.get(&PosOnOff::from((x, y, z))) == True {
+                        write!(f, "{} ", match z {
+                            true => {"T"}
+                            false => {"F"}
+                        })?;
+                        break;
+                    }
+                    if !z {
+                        write!(f, "? ")?;
+                    }
+                }
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
+    }
+}
+
+impl<const SIZE: usize>  Debug for TFBoard<SIZE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for x in 0..SIZE {
+            for y in 0..SIZE {
+                write!(f, "[")?;
+                for z in [true, false] {
+                    write!(f, "{:?},", *self.get(&PosOnOff::from((x, y, z))))?;
                 }
                 write!(f, "]")?;
             }
