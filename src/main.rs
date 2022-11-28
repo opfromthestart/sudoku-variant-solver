@@ -1,9 +1,119 @@
-use crate::board::LogicVal::False;
-use crate::board::{Puzzle, LogicVal, SdkBoard, Tuple3D, TFBoard, PosOnOff, Board, get_empty_pos};
+use std::collections::hash_map::RandomState;
+use crate::board::LogicVal::{False, True};
+use crate::board::{Puzzle, LogicVal, SdkBoard, Tuple3D, TFBoard, PosOnOff, Board, get_empty_pos, differ};
 use crate::constraints::{CellConstraint, ColExistConstraint, ColUniqueConstraint, Constraint, DigitExistConstraint, DigitUniqueConstraint, GivenConstraint, LessThanConstraint, OhHiCol3Constraint, OhHiColBalancedConstraint, OhHiColUniqueConstraint, OhHiRow3Constraint, OhHiRowBalancedConstraint, OhHiRowUniqueConstraint, RowExistConstraint, RowUniqueConstraint};
+use crate::det_hash::DetBuildHash;
 
 mod board;
 mod constraints;
+mod det_hash;
+
+pub fn true_board<const SIZE: usize>() -> TFBoard<SIZE> {
+    assert_eq!(SIZE, size);
+                let mut true_vec = vec![
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    True, False,
+                    True, False,
+                    False, True,
+                    True, False,
+                    False, True,
+                    False, True,
+                ];
+                TFBoard { data: true_vec }
+            }
 
 // Goals
 // Offshoots of this one:
@@ -103,9 +213,10 @@ fn get_hint_string<const SIZE: usize>(vec: &Vec<Tuple3D<SIZE>>) -> String{
     }
 }
 
+const size : usize = 10;
+
 fn main() {
     let t = GameType::OhHi;
-    const size : usize = 20;
 
     match t {
         GameType::Normal | GameType::Jigsaw | GameType::Futoshiki | GameType::Thermo  => {
@@ -167,7 +278,7 @@ fn main() {
                 cons.push(Box::new(GivenConstraint { pos: i }));
             }
 
-            let mut game = Puzzle::<Tuple3D<size>,_>::init(size);
+            let mut game = Puzzle::<Tuple3D<size>,_,RandomState>::init(size);
             game.constraints = cons;
 
             println!("{}", get_hint_string(&vec![game.weak_hint().unwrap()]));
@@ -200,126 +311,73 @@ fn main() {
             ];
 
             let givens = vec![
-                (0,0,true),
-(0,6,true),
-(0,7,true),
-(0,10,true),
-(0,12,false),
-(0,17,false),
-(1,0,true),
-(1,3,true),
-(1,9,false),
-(1,16,true),
-(2,6,true),
-(2,13,false),
-(2,17,false),
-(3,3,true),
-(3,5,true),
-(3,7,true),
-(3,10,false),
-(3,18,false),
-(3,19,true),
+                (0,0,false),
+(0,4,false),
+(0,9,false),
+(1,6,true),
+(1,9,true),
+(2,7,false),
+(3,2,false),
+(3,7,false),
 (4,0,true),
-(4,2,true),
-(4,9,true),
-(4,12,false),
-(4,16,false),
-(4,18,false),
-(5,3,false),
+(4,3,true),
+(4,5,true),
 (5,6,false),
-(5,8,false),
-(5,13,true),
-(5,19,false),
-(6,0,true),
-(6,1,true),
-(6,4,true),
-(6,5,true),
-(6,19,true),
+(6,3,true),
 (7,2,false),
-(7,11,true),
-(7,15,true),
-(7,18,false),
-(8,1,true),
-(8,7,false),
-(8,10,true),
-(8,12,false),
-(8,13,false),
-(8,16,false),
-(8,18,false),
-(8,19,false),
+(7,4,false),
+(7,7,true),
+(7,8,true),
+(8,6,false),
+(9,0,false),
 (9,2,false),
+(9,3,true),
 (9,8,true),
-(9,12,false),
-(10,2,false),
-(10,7,false),
-(10,11,true),
-(11,1,true),
-(11,4,true),
-(11,5,true),
-(11,7,true),
-(11,9,false),
-(11,13,false),
-(11,16,true),
-(12,1,true),
-(12,10,true),
-(12,15,true),
-(12,18,true),
-(12,19,true),
-(13,6,false),
-(13,8,true),
-(13,13,false),
-(13,15,true),
-(14,4,false),
-(14,6,true),
-(14,12,false),
-(14,18,true),
-(14,19,true),
-(15,11,true),
-(15,13,true),
-(16,1,true),
-(16,5,false),
-(16,15,false),
-(16,17,false),
-(16,18,false),
-(17,2,false),
-(17,10,true),
-(17,11,true),
-(17,15,false),
-(17,16,false),
-(18,0,true),
-(18,3,true),
-(18,6,true),
-(18,8,true),
-(18,14,true),
-(18,19,true),
-(19,3,true),
-(19,5,true),
-(19,17,false),
-(19,18,false),
             ];
             for i in givens {
                 cons.push(Box::new(GivenConstraint { pos: PosOnOff::from(i) }));
             }
 
-            let mut game = Puzzle::<PosOnOff<size>, _>::init(size);
+
+            let mut game = Puzzle::<PosOnOff<size>, _, DetBuildHash>::init(size);
             game.constraints = cons;
 
             let mut tries = 0;
             game.solve_simple(false);
+            //println!("{}", PosOnOff::from((2,4,true)).ha);
             println!("{}", game.board);
             let mut last = game.board.clone();
             let mut chain = game.find_odd_loops(None, true);
-            while game.solve_debug(true) {
+
+            let fail = |b : &TFBoard<size>, con: &Box<dyn Constraint<PosOnOff<size>, TFBoard<size>>>| {match get_empty_pos(b) {
+                None => {None}
+                Some(v) => {Some(format!("{:?}\n{:?}", v, con))}
+            }};
+
+            let fail2 = |b : &TFBoard<size>, con: &Box<dyn Constraint<PosOnOff<size>, TFBoard<size>>>| {match b.get(&PosOnOff::from((1,3,true))) {
+                LogicVal::Poss | LogicVal::True => {None}
+                LogicVal::False => {Some(format!("{:?}", con))}
+            }};
+
+            let fail3 : Box<dyn Fn(&TFBoard<size>, &Box<dyn Constraint<PosOnOff<size>, TFBoard<size>>>) -> Option<String>> = Box::new(|b : &TFBoard<size>, con: &Box<dyn Constraint<PosOnOff<size>, TFBoard<size>>>|
+                {match differ(b,&true_board()) {
+                false => {None}
+                true => {Some(format!("{:?}", con))}
+            }});
+
+            while game.solve_debug(true, &Box::new(&fail3)) {
                 tries += 1;
 
-                /*
-                if game.board.get(&PosOnOff::from((9,0,false))) == LogicVal::False {
+
+                if game.board.get(&PosOnOff::from((1,3,true))) == LogicVal::False {
                     break;
                 }
                 last = game.board.clone();
                 chain = game.find_odd_loops(None, true);
 
-                 */
+
+
+
                 //println!("{}", game.board);
                 //println!("{:?}", game.board);
                 //println!("{}", tries);
@@ -327,6 +385,7 @@ fn main() {
             println!("{:?}", last);
             println!("{}", last);
 
+            chain = game.find_odd_loops(None, true);
             for i in chain.1 {
                 println!("{:?}", i);
             }

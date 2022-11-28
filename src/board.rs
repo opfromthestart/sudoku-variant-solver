@@ -1,13 +1,14 @@
 use crate::board::LogicVal::{False, Poss, True};
-use crate::constraints::Constraint;
+use crate::constraints::{Constraint, GivenConstraint};
 use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{BuildHasher, Hash, Hasher};
+use crate::true_board;
 
 // SudokuStandard
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LogicVal {
     True,
     Poss,
@@ -21,7 +22,7 @@ pub struct GraphNode<T> {
     conn: Vec<T>,
 }
 
-type Graph<'a, T> = HashMap<T, GraphNode<T>>;
+type Graph<'a, T, B> = HashMap<T, GraphNode<T>, B>;
 
 impl PartialEq<LogicVal> for &LogicVal {
     fn eq(&self, other: &LogicVal) -> bool {
@@ -42,10 +43,10 @@ impl PartialEq<LogicVal> for &LogicVal {
     }
 }
 
-pub struct Puzzle<T : Eq + Hash + Enumerable + Clone, S : Board<T>> {
+pub struct Puzzle<T : Eq + Hash + Enumerable + Clone, S : Board<T>, B : BuildHasher + Clone> {
     pub board: S,
     pub constraints: Vec<Box<dyn Constraint<T,S>>>,
-    hasher : RandomState,
+    hasher : B,
 }
 
 /*
@@ -345,7 +346,7 @@ pub fn get_empty_pos<S : Board<PosOnOff<SIZE>>, const SIZE:usize>(board: &S) -> 
     None
 }
 
-impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
+impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>, B: BuildHasher + Clone> Puzzle<T, S, B> {
     /*
     pub(crate) fn init(size: usize) -> Puzzle<T, S>;
     {
@@ -518,7 +519,7 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
                 //let mut ret_str = format!("{}{}, \n", row, y + 1);
                 let mut ret_vec = vec![];
                 for path in matched_paths {
-                    let path_r: HashSet<&T> = {
+                    let path_r: HashSet<&T, B> = {
                         let mut temp = HashSet::with_hasher(self.hasher.clone());
                         temp.extend(path.iter());
                         temp
@@ -541,10 +542,13 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
     }
 
     /// Gets all weak links from a given position
-    fn get_weaks(&self, pos: &T) -> HashSet<T> {
+    fn get_weaks(&self, pos: &T) -> HashSet<T, B> {
         let mut ret = HashSet::with_hasher(self.hasher.clone());
         for con in &self.constraints {
-            let temp = con.affects(&self.board, pos);
+            let temp : Vec<_> = con.affects(&self.board, pos)
+                .iter().filter(|x| self.board.get(x) == Poss).map(|x| x.clone()).collect();
+
+
             /*
             for i in &temp {
                 eprint!("({},{},{}),", i.0,i.1,i.2);
@@ -585,8 +589,8 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
      */
 
     /// Get the graph of weak links for the puzzle
-    fn graph(&self) -> Graph<T> {
-        let mut graph: Graph<T> = HashMap::with_hasher(self.hasher.clone());
+    fn graph(&self) -> Graph<T,B> {
+        let mut graph: Graph<T,B> = HashMap::with_hasher(self.hasher.clone());
         for pos in T::positions() {
             if self.board.get(&pos) == Poss {
                 let mut node = GraphNode {
@@ -610,7 +614,7 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
     }
 
     /// Get the graph of strong links for the puzzle
-    fn graph_strong(&self) -> Graph<T> {
+    fn graph_strong(&self) -> Graph<T, B> {
         let mut weak_graph = self.graph();
         let mut to_rem = Vec::new();
         for start in weak_graph.values() {
@@ -875,7 +879,7 @@ impl<T : Eq + Hash + Enumerable + Clone, S : Board<T>> Puzzle<T, S> {
     }
 }
 
-impl<const SIZE: usize>  Puzzle<Tuple3D<SIZE>, SdkBoard<SIZE>> {
+impl<B: BuildHasher + Clone + Default, const SIZE: usize>  Puzzle<Tuple3D<SIZE>, SdkBoard<SIZE>, B> {
     pub(crate) fn init(size: usize) -> Self
     {
         let s = Self {
@@ -883,7 +887,7 @@ impl<const SIZE: usize>  Puzzle<Tuple3D<SIZE>, SdkBoard<SIZE>> {
                 data: vec![Poss; size * size * size],
             },
             constraints: vec![],
-            hasher: RandomState::new(),
+            hasher: B::default(),
         };
         s
     }
@@ -926,9 +930,11 @@ impl<const SIZE: usize>  Puzzle<Tuple3D<SIZE>, SdkBoard<SIZE>> {
             }
         }
     }
+
+
 }
 
-impl<const SIZE: usize>  Puzzle<PosOnOff<SIZE>, TFBoard<SIZE>> {
+impl<B: BuildHasher + Clone + Default, const SIZE: usize>  Puzzle<PosOnOff<SIZE>, TFBoard<SIZE>, B> {
     pub(crate) fn init(size: usize) -> Self
     {
         let s = Self {
@@ -936,30 +942,30 @@ impl<const SIZE: usize>  Puzzle<PosOnOff<SIZE>, TFBoard<SIZE>> {
                 data: vec![Poss; size * size * 2],
             },
             constraints: vec![],
-            hasher: RandomState::new(),
+            hasher: B::default(),
         };
         s
     }
 
-    pub(crate) fn solve_simple_debug(&mut self, slow: bool) -> bool {
+    pub(crate) fn solve_simple_debug(&mut self, slow: bool, fail: &Box<dyn Fn(&TFBoard<SIZE>, &Box<dyn Constraint<PosOnOff<SIZE>, TFBoard<SIZE>>>) -> Option<String>>) -> bool {
         let mut did = false;
         for con in &self.constraints {
             if !slow {
                 did = con.apply(&mut self.board) || did;
-                if let Some(v) = get_empty_pos(&self.board) {
+                if let Some(v) = fail(&self.board, con) { //let Some(v) = get_empty_pos(&self.board)
                     eprintln!("{}", self.board);
                     eprintln!("{:?}", self.board);
-                    eprintln!("{:?}", v);
+                    eprintln!("{}", v);
                     panic!("{:?}",con);
                 }
             }
             else {
                 did = did || con.apply(&mut self.board);
-                if let Some(v) = get_empty_pos(&self.board) {
+                if let Some(v) = fail(&self.board, con) {
                     eprintln!("{}", self.board);
                     eprintln!("{:?}", self.board);
-                    eprintln!("{:?}", v);
-                    panic!("{:?}",con);
+                    eprintln!("{}", v);
+                    panic!("Solve Debug");
                 }
             }
         }
@@ -967,17 +973,67 @@ impl<const SIZE: usize>  Puzzle<PosOnOff<SIZE>, TFBoard<SIZE>> {
     }
 
     /// One iteration of attempting to solve the puzzle
-    pub(crate) fn solve_debug(&mut self, slow: bool) -> bool {
-        match self.solve_simple_debug(slow) {
+    pub(crate) fn solve_debug(&mut self, slow: bool, fail: &Box<dyn Fn(&TFBoard<SIZE>, &Box<dyn Constraint<PosOnOff<SIZE>, TFBoard<SIZE>>>) -> Option<String>>) -> bool {
+        match self.solve_simple_debug(slow, fail) {
             true => true,
             false => {
                 if self.board.num_solved() == self.board.max_solved() {
                     return false;
                 }
                 eprintln!("Try loops");
-                self.rem_odd_loops(None, slow).0
+                let backup = self.board.clone();
+                let vt = self.find_odd_loops(None, slow);
+                let (v,_) = self.rem_odd_loops(None, slow);
+                let bx : Box<(dyn Constraint<PosOnOff<SIZE>, TFBoard<SIZE>>)> = Box::new(GivenConstraint{pos: PosOnOff::<SIZE>::from((usize::MAX,usize::MAX,true))});
+                if let Some(n) = fail(&self.board, &bx) {
+                    println!("{}", n);
+                    let p = match differ_pos(&self.board, &true_board::<SIZE>()) {
+                            None => {panic!("No differ point found");}
+                            Some(p) => {p}
+                        };
+                        println!("{:?}", p);
+                    for i in vt.1 {
+                        if i.contains(&p) {
+                            println!("{:?}", i);
+                        }
+                    }
+                    self.board = backup.clone();
+                    for (k,v) in self.get_weaks_debug(&p) {
+                        print!("{:?}:{}, ", k, v);
+                    }
+                    println!();
+                    for (k,v) in self.get_weaks_debug(&PosOnOff::from((2,4,false))) {
+                        print!("{:?}:{}, ", k, v);
+                    }
+                    println!();
+                    println!("{}", self.board);
+                    println!("{:?}", self.board);
+                    panic!("Solve Debug");
+                }
+                v
             }
         }
+    }
+
+    fn get_weaks_debug(&self, pos: &PosOnOff<SIZE>) -> HashMap<PosOnOff<SIZE>, String, B> {
+        let mut ret = HashMap::with_hasher(self.hasher.clone());
+        for con in &self.constraints {
+            let temp : Vec<_> = con.affects(&self.board, pos)
+                .iter().map(|x| (x.clone(), format!("{:?}", con))).collect();
+
+
+            /*
+            for i in &temp {
+                eprint!("({},{},{}),", i.0,i.1,i.2);
+            }
+            if temp.len()>0 {
+                eprintln!();
+            }
+
+             */
+            ret.extend(temp);
+        }
+        ret
     }
 }
 
@@ -1054,4 +1110,34 @@ impl<const SIZE: usize>  Debug for TFBoard<SIZE> {
         }
         Ok(())
     }
+}
+
+pub fn differ<T: Hash + Eq + Enumerable, S: Board<T>>(b1 : &S, b2 : &S) -> bool {
+    for pos in T::positions() {
+        let b1v = b1.get(&pos);
+        let b2v = b2.get(&pos);
+        if b1v != Poss {
+            if b2v != Poss {
+                if *b1v != *b2v {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+pub fn differ_pos<T: Hash + Eq + Enumerable, S: Board<T>>(b1 : &S, b2 : &S) -> Option<T> {
+    for pos in T::positions() {
+        let b1v = b1.get(&pos);
+        let b2v = b2.get(&pos);
+        if b1v != Poss {
+            if b2v != Poss {
+                if *b1v != *b2v {
+                    return Some(pos);
+                }
+            }
+        }
+    }
+    None
 }

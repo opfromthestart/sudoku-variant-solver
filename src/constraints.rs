@@ -633,35 +633,50 @@ impl<S : Board<PosOnOff<SIZE>>, const SIZE:usize> Constraint<PosOnOff<SIZE>, S> 
             return ret;
         }
         let (x,y,z) = v.pos;
+        /*
         if y==0 || y==SIZE-1 {
             return ret;
         }
-        if board.get(&PosOnOff::from((x,y-1,z))) == True {
-            let clear_pos = PosOnOff::from((x, y + 1, z));
-            ret.push(clear_pos);
-        }
-        else if board.get(&PosOnOff::from((x,y+1,z))) == True {
-            let clear_pos = PosOnOff::from((x, y - 1, z));
-            ret.push(clear_pos);
+         */
+        if y>0 && y<SIZE-1 {
+            if board.get(&PosOnOff::from((x, y - 1, z))) == True {
+                let clear_pos = PosOnOff::from((x, y + 1, z));
+                if board.get(&clear_pos) == Poss {
+                    ret.push(clear_pos);
+                }
+            } else if board.get(&PosOnOff::from((x, y + 1, z))) == True {
+                let clear_pos = PosOnOff::from((x, y - 1, z));
+                if board.get(&clear_pos) == Poss {
+                    ret.push(clear_pos);
+                }
+            }
         }
         if y>1 {
             if board.get(&PosOnOff::from((x, y-2, z))) == True {
                 let clear_pos = PosOnOff::from((x , y-1, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
             }
-            if board.get(&PosOnOff::from((x, y-1, z))) == True {
+            }
+            else if board.get(&PosOnOff::from((x, y-1, z))) == True {
                 let clear_pos = PosOnOff::from((x, y-2, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
+            }
             }
         }
         if y< SIZE-2 {
             if board.get(&PosOnOff::from((x, y+2, z))) == True {
                 let clear_pos = PosOnOff::from((x , y+1, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
             }
-            if board.get(&PosOnOff::from((x, y+1, z))) == True {
+            }
+            else if board.get(&PosOnOff::from((x, y+1, z))) == True {
                 let clear_pos = PosOnOff::from((x, y+2, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
+            }
             }
         }
         ret
@@ -726,35 +741,50 @@ impl<S : Board<PosOnOff<SIZE>>, const SIZE:usize> Constraint<PosOnOff<SIZE>, S> 
             return ret;
         }
         let (x,y,z) = v.pos;
+        /*
         if x==0 || x==SIZE-1 {
             return ret;
         }
-        if board.get(&PosOnOff::from((x-1,y,z))) == True {
-            let clear_pos = PosOnOff::from((x+1, y, z));
-            ret.push(clear_pos);
-        }
-        else if board.get(&PosOnOff::from((x+1,y,z))) == True {
-            let clear_pos = PosOnOff::from((x-1, y , z));
-            ret.push(clear_pos);
+         */
+        if x>0 && x<SIZE-1 {
+            if board.get(&PosOnOff::from((x - 1, y, z))) == True {
+                let clear_pos = PosOnOff::from((x + 1, y, z));
+                if board.get(&clear_pos) == Poss {
+                    ret.push(clear_pos);
+                }
+            } else if board.get(&PosOnOff::from((x + 1, y, z))) == True {
+                let clear_pos = PosOnOff::from((x - 1, y, z));
+                if board.get(&clear_pos) == Poss {
+                    ret.push(clear_pos);
+                }
+            }
         }
         if x>1 {
             if board.get(&PosOnOff::from((x - 2, y, z))) == True {
                 let clear_pos = PosOnOff::from((x - 1, y, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
             }
-            if board.get(&PosOnOff::from((x - 1, y, z))) == True {
+            }
+            else if board.get(&PosOnOff::from((x - 1, y, z))) == True {
                 let clear_pos = PosOnOff::from((x - 2, y, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
+            }
             }
         }
         if x< SIZE-2 {
             if board.get(&PosOnOff::from((x + 2, y, z))) == True {
                 let clear_pos = PosOnOff::from((x + 1, y, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
             }
-            if board.get(&PosOnOff::from((x + 1, y, z))) == True {
+            }
+            else if board.get(&PosOnOff::from((x + 1, y, z))) == True {
                 let clear_pos = PosOnOff::from((x + 2, y, z));
+                if board.get(&clear_pos) == Poss {
                 ret.push(clear_pos);
+            }
             }
         }
         ret
@@ -995,7 +1025,10 @@ impl<S : Board<PosOnOff<SIZE>>, const SIZE:usize> Constraint<PosOnOff<SIZE>, S> 
             match pair {
                 None => {}
                 Some((_,_)) => {
-                    ret.push(PosOnOff::from((x, v.pos.1, v.pos.2)));
+                    let pos = PosOnOff::from((x, v.pos.1, v.pos.2));
+                    if board.get(&pos) == Poss {
+                        ret.push(pos);
+                    }
                 }
             }
         }
@@ -1101,7 +1134,10 @@ impl<S : Board<PosOnOff<SIZE>>, const SIZE:usize> Constraint<PosOnOff<SIZE>, S> 
             match pair {
                 None => {}
                 Some((_,_)) => {
-                    ret.push(PosOnOff::from((v.pos.0, y, v.pos.2)));
+                    let pos = PosOnOff::from((v.pos.0, y, v.pos.2));
+                    if board.get(&pos) == Poss {
+                        ret.push(pos);
+                    }
                 }
             }
         }
